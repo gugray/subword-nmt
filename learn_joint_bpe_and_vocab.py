@@ -16,7 +16,7 @@ from __future__ import unicode_literals
 
 import sys
 import os
-import codecs
+import io
 import argparse
 import tempfile
 from collections import Counter
@@ -55,6 +55,9 @@ def create_parser():
         '--min-frequency', type=int, default=2, metavar='FREQ',
         help='Stop if no symbol pair has frequency >= FREQ (default: %(default)s))')
     parser.add_argument(
+        '--case-insensitive', action="store_true",
+        help="Learn case-insensitive symbols (everything lowercased).")
+    parser.add_argument(
         '--verbose', '-v', action="store_true",
         help="verbose mode.")
 
@@ -64,16 +67,6 @@ def create_parser():
 
 if __name__ == '__main__':
 
-    # python 2/3 compatibility
-    if sys.version_info < (3, 0):
-        sys.stderr = codecs.getwriter('UTF-8')(sys.stderr)
-        sys.stdout = codecs.getwriter('UTF-8')(sys.stdout)
-        sys.stdin = codecs.getreader('UTF-8')(sys.stdin)
-    else:
-        sys.stderr = codecs.getwriter('UTF-8')(sys.stderr.buffer)
-        sys.stdout = codecs.getwriter('UTF-8')(sys.stdout.buffer)
-        sys.stdin = codecs.getreader('UTF-8')(sys.stdin.buffer)
-
     parser = create_parser()
     args = parser.parse_args()
 
@@ -82,8 +75,8 @@ if __name__ == '__main__':
         sys.exit(1)
 
     # read/write files as UTF-8
-    args.input = [codecs.open(f.name, encoding='UTF-8') for f in args.input]
-    args.vocab = [codecs.open(f.name, 'w', encoding='UTF-8') for f in args.vocab]
+    args.input = [io.open(f.name, encoding='UTF-8') for f in args.input]
+    args.vocab = [io.open(f.name, 'w', encoding='UTF-8') for f in args.vocab]
 
     # get combined vocabulary of all input texts
     full_vocab = Counter()
@@ -94,10 +87,10 @@ if __name__ == '__main__':
     vocab_list = ['{0} {1}'.format(key, freq) for (key, freq) in full_vocab.items()]
 
     # learn BPE on combined vocabulary
-    with codecs.open(args.output.name, 'w', encoding='UTF-8') as output:
-        learn_bpe.main(vocab_list, output, args.symbols, args.min_frequency, args.verbose, is_dict=True)
+    with io.open(args.output.name, 'w', encoding='UTF-8') as output:
+        learn_bpe.main(vocab_list, output, args.symbols, args.min_frequency, args.verbose, is_dict=True, case_insensitive=args.case_insensitive)
 
-    with codecs.open(args.output.name, encoding='UTF-8') as codes:
+    with io.open(args.output.name, encoding='UTF-8') as codes:
         bpe = apply_bpe.BPE(codes, args.separator, None)
 
     # apply BPE to each training corpus and get vocabulary
@@ -106,7 +99,7 @@ if __name__ == '__main__':
         tmp = tempfile.NamedTemporaryFile(delete=False)
         tmp.close()
 
-        tmpout = codecs.open(tmp.name, 'w', encoding='UTF-8')
+        tmpout = io.open(tmp.name, 'w', encoding='UTF-8')
 
         train_file.seek(0)
         for line in train_file:
@@ -114,7 +107,7 @@ if __name__ == '__main__':
             tmpout.write('\n')
 
         tmpout.close()
-        tmpin = codecs.open(tmp.name, encoding='UTF-8')
+        tmpin = io.open(tmp.name, encoding='UTF-8')
 
         vocab = learn_bpe.get_vocabulary(tmpin)
         tmpin.close()

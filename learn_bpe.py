@@ -14,7 +14,7 @@ Proceedings of the 54th Annual Meeting of the Association for Computational Ling
 from __future__ import unicode_literals
 
 import sys
-import codecs
+import io
 import re
 import copy
 import argparse
@@ -30,12 +30,14 @@ def create_parser():
         description="learn BPE-based word segmentation")
 
     parser.add_argument(
-        '--input', '-i', type=argparse.FileType('r'), default=sys.stdin,
+        '--input', '-i', type=argparse.FileType('r'),
+        required=True,
         metavar='PATH',
         help="Input text (default: standard input).")
 
     parser.add_argument(
-        '--output', '-o', type=argparse.FileType('w'), default=sys.stdout,
+        '--output', '-o', type=argparse.FileType('w'),
+        required=True,
         metavar='PATH',
         help="Output file for BPE codes (default: standard output)")
     parser.add_argument(
@@ -47,21 +49,28 @@ def create_parser():
     parser.add_argument('--dict-input', action="store_true",
         help="If set, input file is interpreted as a dictionary where each line contains a word-count pair")
     parser.add_argument(
+        '--case-insensitive', action="store_true",
+        help="Learn case-insensitive symbols (everything lowercased).")
+    parser.add_argument(
         '--verbose', '-v', action="store_true",
         help="verbose mode.")
 
     return parser
 
-def get_vocabulary(fobj, is_dict=False):
+def get_vocabulary(fobj, is_dict=False, case_insensitive=False):
     """Read text and return dictionary that encodes vocabulary
     """
     vocab = Counter()
     for line in fobj:
         if is_dict:
-            word, count = line.strip().split()
+            normline = line
+            if case_insensitive: normline = line.lower()
+            word, count = normline.strip().split()
             vocab[word] = int(count)
         else:
-            for word in line.split():
+            normline = line
+            if case_insensitive: normline = line.lower()
+            for word in normline.split():
                 vocab[word] += 1
     return vocab
 
@@ -183,7 +192,7 @@ def prune_stats(stats, big_stats, threshold):
                 big_stats[item] = freq
 
 
-def main(infile, outfile, num_symbols, min_frequency=2, verbose=False, is_dict=False):
+def main(infile, outfile, num_symbols, min_frequency=2, verbose=False, is_dict=False, case_insensitive=False):
     """Learn num_symbols BPE operations from vocabulary, and write to outfile.
     """
 
@@ -191,7 +200,7 @@ def main(infile, outfile, num_symbols, min_frequency=2, verbose=False, is_dict=F
     # version numbering allows bckward compatibility
     outfile.write('#version: 0.2\n')
 
-    vocab = get_vocabulary(infile, is_dict)
+    vocab = get_vocabulary(infile, is_dict, case_insensitive)
     vocab = dict([(tuple(x[:-1])+(x[-1]+'</w>',) ,y) for (x,y) in vocab.items()])
     sorted_vocab = sorted(vocab.items(), key=lambda x: x[1], reverse=True)
 
@@ -228,23 +237,11 @@ def main(infile, outfile, num_symbols, min_frequency=2, verbose=False, is_dict=F
 
 if __name__ == '__main__':
 
-    # python 2/3 compatibility
-    if sys.version_info < (3, 0):
-        sys.stderr = codecs.getwriter('UTF-8')(sys.stderr)
-        sys.stdout = codecs.getwriter('UTF-8')(sys.stdout)
-        sys.stdin = codecs.getreader('UTF-8')(sys.stdin)
-    else:
-        sys.stderr = codecs.getwriter('UTF-8')(sys.stderr.buffer)
-        sys.stdout = codecs.getwriter('UTF-8')(sys.stdout.buffer)
-        sys.stdin = codecs.getreader('UTF-8')(sys.stdin.buffer)
-
     parser = create_parser()
     args = parser.parse_args()
 
     # read/write files as UTF-8
-    if args.input.name != '<stdin>':
-        args.input = codecs.open(args.input.name, encoding='utf-8')
-    if args.output.name != '<stdout>':
-        args.output = codecs.open(args.output.name, 'w', encoding='utf-8')
+    args.input = io.open(args.input.name, encoding='utf-8')
+    args.output = io.open(args.output.name, 'w', encoding='utf-8')
 
-    main(args.input, args.output, args.symbols, args.min_frequency, args.verbose, is_dict=args.dict_input)
+    main(args.input, args.output, args.symbols, args.min_frequency, args.verbose, is_dict=args.dict_input, case_insensitive=args.case_insensitive)
