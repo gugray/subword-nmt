@@ -18,6 +18,7 @@ import codecs
 import argparse
 import json
 import re
+import io
 from collections import defaultdict
 
 # hack for python2/3 compatibility
@@ -288,13 +289,13 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # read/write files as UTF-8
-    args.codes = codecs.open(args.codes.name, encoding='utf-8')
+    args.codes = io.open(args.codes.name, encoding='utf-8')
     if args.input.name != '<stdin>':
-        args.input = codecs.open(args.input.name, encoding='utf-8')
+        args.input = io.open(args.input.name, encoding='utf-8')
     if args.output.name != '<stdout>':
-        args.output = codecs.open(args.output.name, 'w', encoding='utf-8')
+        args.output = io.open(args.output.name, 'w', encoding='utf-8')
     if args.vocabulary:
-        args.vocabulary = codecs.open(args.vocabulary.name, encoding='utf-8')
+        args.vocabulary = io.open(args.vocabulary.name, encoding='utf-8')
 
     if args.vocabulary:
         vocabulary = read_vocabulary(args.vocabulary, args.vocabulary_threshold)
