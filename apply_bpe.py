@@ -14,7 +14,6 @@ Proceedings of the 54th Annual Meeting of the Association for Computational Ling
 from __future__ import unicode_literals, division
 
 import sys
-import codecs
 import argparse
 import json
 import re
@@ -85,7 +84,8 @@ def create_parser():
         description="learn BPE-based word segmentation")
 
     parser.add_argument(
-        '--input', '-i', type=argparse.FileType('r'), default=sys.stdin,
+        '--input', '-i', type=argparse.FileType('r'),
+        required=True,
         metavar='PATH',
         help="Input file (default: standard input).")
     parser.add_argument(
@@ -93,7 +93,8 @@ def create_parser():
         required=True,
         help="File with BPE codes (created by learn_bpe.py).")
     parser.add_argument(
-        '--output', '-o', type=argparse.FileType('w'), default=sys.stdout,
+        '--output', '-o', type=argparse.FileType('w'),
+        required=True,
         metavar='PATH',
         help="Output file (default: standard output)")
     parser.add_argument(
@@ -202,7 +203,6 @@ def recursive_split(segment, bpe_codes, vocab, separator, final=False):
         else:
             left, right = bpe_codes[segment]
     except:
-        #sys.stderr.write('cannot split {0} further.\n'.format(segment))
         yield segment
         return
 
@@ -228,7 +228,6 @@ def check_vocab_and_split(orig, bpe_codes, vocab, separator):
         if segment + separator in vocab:
             out.append(segment)
         else:
-            #sys.stderr.write('OOV: {0}\n'.format(segment))
             for item in recursive_split(segment, bpe_codes, vocab, separator, False):
                 out.append(item)
 
@@ -236,7 +235,6 @@ def check_vocab_and_split(orig, bpe_codes, vocab, separator):
     if segment in vocab:
         out.append(segment)
     else:
-        #sys.stderr.write('OOV: {0}\n'.format(segment))
         for item in recursive_split(segment, bpe_codes, vocab, separator, True):
             out.append(item)
 
@@ -275,25 +273,13 @@ def isolate_glossary(word, glossary):
 
 if __name__ == '__main__':
 
-    # python 2/3 compatibility
-    if sys.version_info < (3, 0):
-        sys.stderr = codecs.getwriter('UTF-8')(sys.stderr)
-        sys.stdout = codecs.getwriter('UTF-8')(sys.stdout)
-        sys.stdin = codecs.getreader('UTF-8')(sys.stdin)
-    else:
-        sys.stderr = codecs.getwriter('UTF-8')(sys.stderr.buffer)
-        sys.stdout = codecs.getwriter('UTF-8')(sys.stdout.buffer)
-        sys.stdin = codecs.getreader('UTF-8')(sys.stdin.buffer)
-
     parser = create_parser()
     args = parser.parse_args()
 
     # read/write files as UTF-8
     args.codes = io.open(args.codes.name, encoding='utf-8')
-    if args.input.name != '<stdin>':
-        args.input = io.open(args.input.name, encoding='utf-8')
-    if args.output.name != '<stdout>':
-        args.output = io.open(args.output.name, 'w', encoding='utf-8')
+    args.input = io.open(args.input.name, encoding='utf-8')
+    args.output = io.open(args.output.name, 'w', encoding='utf-8')
     if args.vocabulary:
         args.vocabulary = io.open(args.vocabulary.name, encoding='utf-8')
 
