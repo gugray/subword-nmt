@@ -71,7 +71,11 @@ def get_vocabulary(fobj, is_dict=False, case_insensitive=False):
             normline = line
             if case_insensitive: normline = line.lower()
             for word in normline.split():
-                vocab[word] += 1
+                # Must strip features from end
+                feat_pos = word.find('￨')
+                real_word = word
+                if feat_pos > -1: real_word = word[:feat_pos]
+                vocab[real_word] += 1
     return vocab
 
 def update_pair_statistics(pair, changed, stats, indices):
