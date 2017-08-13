@@ -26,7 +26,7 @@ argparse.open = open
 
 class BPE(object):
 
-    def __init__(self, codes, separator, vocab=None, glossaries=None):
+    def __init__(self, codes, separator, vocab=None, glossaries=None, case_feature=False):
 
         # check version information
         firstline = codes.readline()
@@ -49,13 +49,20 @@ class BPE(object):
 
         self.glossaries = glossaries if glossaries else []
 
+        self.case_feature = case_feature
+
         self.cache = {}
 
     def segment(self, sentence):
         """segment single sentence (whitespace-tokenized string) with BPE encoding"""
         output = []
         for word in sentence.split():
-            new_word = [out for segment in self._isolate_glossaries(word)
+            norm_word = word
+            if self.case_feature:
+                norm_word = word.lower()
+                # Feature symbol is ￨ E8FF
+                if '￨' in norm_word: norm_word = norm_word.replace('￨', '|')
+            new_word = [out for segment in self._isolate_glossaries(norm_word)
                         for out in encode(segment,
                                           self.bpe_codes,
                                           self.bpe_codes_reverse,
@@ -64,10 +71,25 @@ class BPE(object):
                                           self.version,
                                           self.cache,
                                           self.glossaries)]
-
-            for item in new_word[:-1]:
-                output.append(item + self.separator)
-            output.append(new_word[-1])
+            
+            # No case feature: output is simple concatenation
+            if not self.case_feature:
+                for item in new_word[:-1]:
+                    output.append(item + self.separator)
+                output.append(new_word[-1])
+            else:
+                pos = 0
+                for item in new_word[:-1]:
+                    length = len(item)
+                    surf = word[pos:pos+length]
+                    feat = get_case_feature(surf)
+                    # Feature symbol is ￨ E8FF
+                    output.append(item + self.separator + "￨" + feat)
+                    pos += length
+                surf = word[pos:]
+                feat = get_case_feature(surf)
+                # Feature symbol is ￨ E8FF
+                output.append(new_word[-1] + "￨" + feat)
 
         return ' '.join(output)
 
@@ -113,8 +135,41 @@ def create_parser():
         metavar="STR",
         help="Glossaries. The strings provided in glossaries will not be affected"+
              "by the BPE (i.e. they will neither be broken into subwords, nor concatenated with other subwords")
+    parser.add_argument(
+        '--case-feature', action="store_true",
+        help="Segment with lower-case codes, add case feature to tokens.")
 
     return parser
+
+def get_case_feature(surf):
+    # Feature encodes what is uppercase in word
+    # S - start (first char) only
+    # E - end (last char) only
+    # B - both (first and last, but not in-between)
+    # A - all (all caps)
+    # N - nothing
+    u_start = surf[0].isupper()
+    length = len(surf)
+    if length == 1:
+        if u_start: return "S"
+        else: return "N"
+    u_end = surf[-1].isupper()
+    if length == 2:
+        if u_start and u_end: return "A"
+        elif u_start: return "S"
+        elif u_end: return "E"
+        else: return "N"
+    u_mid = True
+    for i in range(1, length - 1):
+        if not surf[i].isupper():
+            u_mid = False
+            break
+    if u_end:
+        if u_start and u_mid: return "A"
+        elif u_start: return "B"
+        else: return "E"
+    if u_start: return "S"
+    else: return "N"
 
 def get_pairs(word):
     """Return set of symbol pairs in a word.
@@ -290,7 +345,7 @@ if __name__ == '__main__':
 
     separator = '@@'
     if args.opennmt_separator: separator = '￭'
-    bpe = BPE(args.codes, separator, vocabulary, args.glossaries)
+    bpe = BPE(args.codes, separator, vocabulary, args.glossaries, args.case_feature)
 
     for line in args.input:
         args.output.write(bpe.segment(line).strip())
