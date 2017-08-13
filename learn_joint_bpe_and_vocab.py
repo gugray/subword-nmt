@@ -45,8 +45,8 @@ def create_parser():
         '--symbols', '-s', type=int, default=10000,
         help="Create this many new symbols (each representing a character n-gram) (default: %(default)s))")
     parser.add_argument(
-        '--separator', type=str, default='@@', metavar='STR',
-        help="Separator between non-final subword units (default: '%(default)s'))")
+        '--opennmt-separator', action="store_true",
+        help="Use OpenNMT's separator instead of @@.")
     parser.add_argument(
         '--write-vocabulary', type=argparse.FileType('w'), nargs = '+', default=None,
         metavar='PATH', dest='vocab',
@@ -90,8 +90,10 @@ if __name__ == '__main__':
     with io.open(args.output.name, 'w', encoding='UTF-8') as output:
         learn_bpe.main(vocab_list, output, args.symbols, args.min_frequency, args.verbose, is_dict=True, case_insensitive=args.case_insensitive)
 
+    separator = '@@'
+    if args.opennmt_separator: separator = '￭'
     with io.open(args.output.name, encoding='UTF-8') as codes:
-        bpe = apply_bpe.BPE(codes, args.separator, None)
+        bpe = apply_bpe.BPE(codes, separator, None, case_feature=args.case_insensitive)
 
     # apply BPE to each training corpus and get vocabulary
     for train_file, vocab_file in zip(args.input, args.vocab):
