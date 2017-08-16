@@ -18,6 +18,7 @@ import argparse
 import json
 import re
 import io
+import codecs
 from collections import defaultdict
 
 # hack for python2/3 compatibility
@@ -106,8 +107,8 @@ def create_parser():
         description="learn BPE-based word segmentation")
 
     parser.add_argument(
-        '--input', '-i', type=argparse.FileType('r'),
-        required=True,
+        '--input', '-i', type=argparse.FileType('r'), default=sys.stdin,
+        required=False,
         metavar='PATH',
         help="Input file (default: standard input).")
     parser.add_argument(
@@ -115,8 +116,8 @@ def create_parser():
         required=True,
         help="File with BPE codes (created by learn_bpe.py).")
     parser.add_argument(
-        '--output', '-o', type=argparse.FileType('w'),
-        required=True,
+        '--output', '-o', type=argparse.FileType('w'), default=sys.stdout,
+        required=False,
         metavar='PATH',
         help="Output file (default: standard output)")
     parser.add_argument(
@@ -328,13 +329,25 @@ def isolate_glossary(word, glossary):
 
 if __name__ == '__main__':
 
+    # python 2/3 compatibility
+    if sys.version_info < (3, 0):
+        sys.stderr = codecs.getwriter('UTF-8')(sys.stderr)
+        sys.stdout = codecs.getwriter('UTF-8')(sys.stdout)
+        sys.stdin = codecs.getreader('UTF-8')(sys.stdin)
+    else:
+        sys.stderr = codecs.getwriter('UTF-8')(sys.stderr.buffer)
+        sys.stdout = codecs.getwriter('UTF-8')(sys.stdout.buffer)
+        sys.stdin = codecs.getreader('UTF-8')(sys.stdin.buffer)
+
     parser = create_parser()
     args = parser.parse_args()
 
     # read/write files as UTF-8
     args.codes = io.open(args.codes.name, encoding='utf-8')
-    args.input = io.open(args.input.name, encoding='utf-8')
-    args.output = io.open(args.output.name, 'w', encoding='utf-8')
+    if args.input.name != '<stdin>':
+        args.input = io.open(args.input.name, encoding='utf-8')
+    if args.output.name != '<stdout>':
+        args.output = io.open(args.output.name, 'w', encoding='utf-8')
     if args.vocabulary:
         args.vocabulary = io.open(args.vocabulary.name, encoding='utf-8')
 
